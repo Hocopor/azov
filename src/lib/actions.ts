@@ -9,27 +9,49 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-type AuthenticatedSession = Awaited<ReturnType<typeof auth>> & {
+type AuthenticatedSession = {
   user: {
     id: string;
     role: string;
+    email?: string | null;
+    name?: string | null;
+    image?: string | null;
   };
 };
 
 async function requireSession(): Promise<AuthenticatedSession> {
   const session = await auth();
-  if (!session?.user?.id) {
+  const user = session?.user;
+
+  if (!user?.id) {
     redirect("/auth/sign-in");
   }
-  return session as AuthenticatedSession;
+
+  return {
+    user: {
+      id: user.id,
+      role: String(user.role ?? "USER"),
+      email: user.email ?? null,
+      name: user.name ?? null,
+      image: user.image ?? null,
+    },
+  };
 }
 
 async function requireAdmin(): Promise<AuthenticatedSession & { user: { id: string; role: UserRole.ADMIN } }> {
   const session = await requireSession();
+
   if (session.user.role !== UserRole.ADMIN) {
     redirect("/");
   }
-  return session as AuthenticatedSession & { user: { id: string; role: UserRole.ADMIN } };
+
+  return {
+    ...session,
+    user: {
+      id: session.user.id,
+      role: UserRole.ADMIN,
+    },
+  };
 }
 
 export async function registerUser(formData: FormData) {

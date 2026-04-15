@@ -38,7 +38,7 @@ async function requireSession(): Promise<AuthenticatedSession> {
   };
 }
 
-async function requireAdmin(): Promise<AuthenticatedSession & { user: { id: string; role: UserRole.ADMIN } }> {
+async function requireAdmin(): Promise<AuthenticatedSession & { user: { id: string; role: "ADMIN" } }> {
   const session = await requireSession();
 
   if (session.user.role !== UserRole.ADMIN) {
@@ -49,7 +49,7 @@ async function requireAdmin(): Promise<AuthenticatedSession & { user: { id: stri
     ...session,
     user: {
       id: session.user.id,
-      role: UserRole.ADMIN,
+      role: "ADMIN",
     },
   };
 }

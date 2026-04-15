@@ -1,14 +1,27 @@
 import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
 import { EventName, Prisma } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
+function toPrismaJson(
+  value: unknown,
+): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return Prisma.JsonNull;
+  }
+
+  return value as Prisma.InputJsonValue;
+}
 
 export async function saveAnalyticsEvent(input: {
   eventName: EventName;
   path: string;
   roomSlug?: string;
   sessionId?: string;
-  meta?: Prisma.JsonValue;
+  meta?: unknown;
 }) {
   const cookieStore = await cookies();
   const headerStore = await headers();
@@ -27,10 +40,7 @@ export async function saveAnalyticsEvent(input: {
       utmSource,
       utmMedium,
       utmCampaign,
-      meta:
-        input.meta === null
-          ? Prisma.JsonNull
-          : (input.meta as Prisma.InputJsonValue | undefined),
+      meta: toPrismaJson(input.meta),
     },
   });
 }

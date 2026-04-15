@@ -4,14 +4,16 @@ import { db } from "@/lib/db";
 import { cancelBookingAction } from "@/lib/actions";
 import { formatDate, formatMoney } from "@/lib/utils";
 import { getBookingSettings } from "@/lib/settings";
+import { BookingStatus } from "@prisma/client";
 
 export default async function AccountBookingsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/sign-in");
+  const userId = session.user.id;
 
   const [bookings, settings] = await Promise.all([
     db.booking.findMany({
-      where: { userId: session.user.id },
+      where: { userId },
       include: { room: true, payments: true },
       orderBy: { createdAt: "desc" },
     }),
@@ -34,6 +36,11 @@ export default async function AccountBookingsPage() {
             const daysBeforeArrival = Math.ceil((booking.startDate.getTime() - Date.now()) / 86400000);
             const fullRefund = daysBeforeArrival >= settings.freeCancellationDays;
             const partialRefund = !fullRefund && daysBeforeArrival >= settings.partialRefundDays;
+            const canCancel =
+              booking.status !== BookingStatus.CANCELLED_BY_GUEST &&
+              booking.status !== BookingStatus.CANCELLED_BY_ADMIN &&
+              booking.status !== BookingStatus.COMPLETED;
+
             return (
               <article key={booking.id} className="surface rounded-[2rem] p-6">
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -68,7 +75,7 @@ export default async function AccountBookingsPage() {
                     </p>
                   </div>
 
-                  {!["CANCELLED_BY_GUEST", "CANCELLED_BY_ADMIN", "COMPLETED"].includes(booking.status) ? (
+                  {canCancel ? (
                     <form action={cancelBookingAction.bind(null, booking.id)}>
                       <button className="cta-danger">Отменить бронь</button>
                     </form>

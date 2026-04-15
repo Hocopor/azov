@@ -9,20 +9,27 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-async function requireSession() {
+type AuthenticatedSession = Awaited<ReturnType<typeof auth>> & {
+  user: {
+    id: string;
+    role: string;
+  };
+};
+
+async function requireSession(): Promise<AuthenticatedSession> {
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/auth/sign-in");
   }
-  return session;
+  return session as AuthenticatedSession;
 }
 
-async function requireAdmin() {
+async function requireAdmin(): Promise<AuthenticatedSession & { user: { id: string; role: UserRole.ADMIN } }> {
   const session = await requireSession();
   if (session.user.role !== UserRole.ADMIN) {
     redirect("/");
   }
-  return session;
+  return session as AuthenticatedSession & { user: { id: string; role: UserRole.ADMIN } };
 }
 
 export async function registerUser(formData: FormData) {

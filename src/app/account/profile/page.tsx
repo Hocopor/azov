@@ -10,7 +10,8 @@ export default async function AccountProfilePage({
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/sign-in");
-  const user = await db.user.findUnique({ where: { id: session.user.id } });
+  const userId = session.user.id;
+  const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) redirect("/auth/sign-in");
   const params = await searchParams;
 

@@ -94,8 +94,11 @@ export async function deleteAccountAction() {
 
   if (!user) redirect("/");
 
-  const activeBooking = user.bookings.some((booking) =>
-    [BookingStatus.PENDING_PAYMENT, BookingStatus.DEPOSIT_PAID, BookingStatus.CONFIRMED].includes(booking.status),
+  const activeBooking = user.bookings.some(
+    (booking) =>
+      booking.status === BookingStatus.PENDING_PAYMENT ||
+      booking.status === BookingStatus.DEPOSIT_PAID ||
+      booking.status === BookingStatus.CONFIRMED,
   );
 
   if (activeBooking) {

@@ -1,0 +1,317 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum KitchenType {
+  PRIVATE
+  SHARED
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  DEPOSIT_PAID
+  CONFIRMED
+  CANCELLED_BY_GUEST
+  CANCELLED_BY_ADMIN
+  COMPLETED
+  NO_SHOW
+}
+
+enum BookingSource {
+  WEBSITE
+  PHONE
+  ADMIN
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  FAILED
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum EventName {
+  PAGE_VIEW
+  HERO_CTA_CLICK
+  ROOM_CARD_CLICK
+  AVAILABILITY_SEARCH
+  BOOKING_STARTED
+  BOOKING_CREATED
+  CHECKOUT_STARTED
+  PAYMENT_SUCCEEDED
+  PAYMENT_FAILED
+  CONTACT_CLICK
+}
+
+model User {
+  id               String    @id @default(cuid())
+  name             String?
+  email            String?   @unique
+  emailVerified    DateTime?
+  image            String?
+  phone            String?
+  passwordHash     String?
+  role             UserRole  @default(USER)
+  marketingConsent Boolean   @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  accounts         Account[]
+  sessions         Session[]
+  bookings         Booking[]
+  posts            Post[]
+  auditLogs        AuditLog[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionToken])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Room {
+  id               String       @id @default(cuid())
+  slug             String       @unique
+  title            String
+  shortDescription String
+  description      String       @db.Text
+  priceFrom        Int
+  capacityAdults   Int
+  capacityChildren Int          @default(0)
+  beds             String
+  sizeSqm          Int
+  kitchenType      KitchenType
+  bathroomCount    Int          @default(1)
+  airConditioning  Boolean      @default(false)
+  petsAllowed      Boolean      @default(false)
+  smokingAllowed   Boolean      @default(false)
+  featured         Boolean      @default(false)
+  isPublished      Boolean      @default(true)
+  sortOrder        Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  images           RoomImage[]
+  bookings         Booking[]
+  blocks           RoomBlock[]
+  amenities        RoomAmenity[]
+}
+
+model RoomImage {
+  id        String   @id @default(cuid())
+  roomId     String
+  url       String
+  alt       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model Amenity {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  icon        String?
+  description String?
+  rooms       RoomAmenity[]
+}
+
+model RoomAmenity {
+  roomId    String
+  amenityId String
+  room      Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  amenity   Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, amenityId])
+}
+
+model Booking {
+  id                     String         @id @default(cuid())
+  userId                 String?
+  roomId                 String
+  status                 BookingStatus  @default(PENDING_PAYMENT)
+  source                 BookingSource  @default(WEBSITE)
+  guestName              String
+  phone                  String
+  email                  String?
+  adults                 Int
+  children               Int            @default(0)
+  hasPets                Boolean        @default(false)
+  smoking                Boolean        @default(false)
+  needsTransfer          Boolean        @default(false)
+  transferFrom           String?
+  transferDate           DateTime?
+  transferUnknown        Boolean        @default(false)
+  comment                String?        @db.Text
+  startDate              DateTime
+  endDate                DateTime
+  nights                 Int
+  guestsTotal            Int
+  totalAmount            Int
+  depositType            String         @default("fixed")
+  depositValue           Int
+  depositAmount          Int
+  paymentExpiresAt       DateTime?
+  refundableUntil        DateTime?
+  cancellationPolicyNote String?        @db.Text
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  room                   Room           @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  user                   User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payments               Payment[]
+
+  @@index([roomId, startDate, endDate])
+  @@index([status])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  bookingId         String
+  provider          String        @default("yookassa")
+  providerPaymentId String?       @unique
+  status            PaymentStatus @default(PENDING)
+  amount            Int
+  currency          String        @default("RUB")
+  returnUrl         String?
+  receiptEmail      String?
+  rawPayload        Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model RoomBlock {
+  id          String   @id @default(cuid())
+  roomId       String
+  title       String
+  reason      String?
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, startDate, endDate])
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  summary     String
+  description String   @db.Text
+  priceLabel  String
+  featured    Boolean  @default(false)
+  isEnabled   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Post {
+  id           String     @id @default(cuid())
+  authorId      String?
+  slug         String     @unique
+  title        String
+  excerpt      String?
+  body         String     @db.Text
+  coverImage   String?
+  gallery      String[]   @default([])
+  videoUrl     String?
+  status       PostStatus @default(DRAFT)
+  publishedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+}
+
+model Setting {
+  key        String   @id
+  value      Json
+  updatedAt  DateTime @updatedAt
+}
+
+model AnalyticsEvent {
+  id          String    @id @default(cuid())
+  eventName   EventName
+  path        String
+  roomSlug    String?
+  sessionId   String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  meta        Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([eventName, createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  entityType  String
+  entityId    String
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+}

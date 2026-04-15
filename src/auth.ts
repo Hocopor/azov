@@ -93,7 +93,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   events: {
     async createUser({ user }) {
-      if (user.email) {
+      if (user.email && user.id) {
         await db.auditLog.create({
           data: {
             userId: user.id,
